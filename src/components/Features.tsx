@@ -36,7 +36,7 @@ export const Features = () => {
           className="text-center mb-16"
         >
           <h2 className="font-display text-4xl md:text-5xl mb-4">
-            Why Choose ChromaPrint?
+            Why Choose ProtoDesign?
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             We combine cutting-edge technology with an inclusive approach to 3D printing.
@@ -53,9 +53,7 @@ export const Features = () => {
               viewport={{ once: true }}
               className="bg-card p-6 rounded-lg shadow-soft hover:shadow-glow transition-smooth"
             >
-              <div className="w-12 h-12 rounded-lg gradient-warm flex items-center justify-center mb-4">
-                <feature.icon className="w-6 h-6 text-primary-foreground" />
-              </div>
+              <feature.icon className="w-8 h-8 text-primary mb-4" />
               <h3 className="font-display text-xl mb-2">{feature.title}</h3>
               <p className="text-muted-foreground">{feature.description}</p>
             </motion.div>
