@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ModelViewer } from "@/components/ModelViewer";
+import { ModelBuilder } from "@/components/ModelBuilder";
 import { AuthModal } from "@/components/AuthModal";
 import { useDropzone } from "react-dropzone";
 import { Upload, Loader2, Sparkles } from "lucide-react";
@@ -102,13 +102,13 @@ const CustomPrinting = () => {
             >
               <Card>
                 <CardHeader>
-                  <CardTitle className="font-display">3D Model Preview</CardTitle>
+                  <CardTitle className="font-display">3D Model Builder</CardTitle>
                   <CardDescription>
-                    Upload your model or use our simple builder
+                    Create custom models using basic shapes or upload your own
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ModelViewer />
+                  <ModelBuilder />
                 </CardContent>
               </Card>
             </motion.div>
