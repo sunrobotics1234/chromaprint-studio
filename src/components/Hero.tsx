@@ -69,10 +69,6 @@ export const Hero = () => {
             <h1 className="font-display text-6xl md:text-7xl lg:text-8xl mb-6 leading-tight">
               High-Fidelity
               <br />
-              <span className="gradient-warm bg-clip-text text-transparent">
-                3D Printing
-              </span>
-              <br />
               in Every Shade
             </h1>
           </motion.div>
