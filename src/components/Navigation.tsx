@@ -12,7 +12,7 @@ export const Navigation = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-20">
           <Link to="/" className="flex items-center space-x-2">
-            <span className="font-display text-2xl font-bold gradient-warm bg-clip-text text-transparent">
+            <span className="font-display text-2xl font-bold text-foreground">
               ProtoDesign
             </span>
           </Link>
