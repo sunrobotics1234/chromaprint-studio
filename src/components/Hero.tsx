@@ -79,7 +79,7 @@ export const Hero = () => {
             transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
             className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl"
           >
-            Specializing in skin-tone accuracy and premium 3D printing services.
+            Specialized in precision and accuracy for premium 3D printing services.
             Shop high-end printers or get instant quotes for custom prints.
           </motion.p>
 
