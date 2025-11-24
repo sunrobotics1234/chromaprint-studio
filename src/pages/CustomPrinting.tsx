@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,8 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ModelBuilder } from "@/components/ModelBuilder";
 import { AuthModal } from "@/components/AuthModal";
 import { useDropzone } from "react-dropzone";
-import { Upload, Loader2, Sparkles } from "lucide-react";
+import { Upload, Loader2, Sparkles, Camera, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const CustomPrinting = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -17,6 +18,10 @@ const CustomPrinting = () => {
   const [isEstimating, setIsEstimating] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [referenceImages, setReferenceImages] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -67,6 +72,54 @@ const CustomPrinting = () => {
     } else {
       toast.success("Added to cart! You'll receive a final quote via email.");
     }
+  };
+
+  const handleImageUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error("Please upload an image file");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please sign in to upload reference images");
+        setShowAuthModal(true);
+        return;
+      }
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${session.user.id}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('reference-images')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('reference-images')
+        .getPublicUrl(fileName);
+
+      await supabase.from('reference_images').insert({
+        user_id: session.user.id,
+        file_name: file.name,
+        file_url: publicUrl
+      });
+
+      setReferenceImages(prev => [...prev, publicUrl]);
+      toast.success("Reference image uploaded!");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to upload image");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleImageUpload(file);
   };
 
   return (
@@ -155,6 +208,69 @@ const CustomPrinting = () => {
                       </div>
                     )}
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Reference Photos Upload */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-display">Reference Photos</CardTitle>
+                  <CardDescription>
+                    Upload or capture photos for reference
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => cameraInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="flex-1"
+                    >
+                      {isUploading ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Camera className="mr-2 h-4 w-4" />
+                      )}
+                      Camera
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="flex-1"
+                    >
+                      <ImageIcon className="mr-2 h-4 w-4" />
+                      Upload Photo
+                    </Button>
+                  </div>
+                  <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  {referenceImages.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {referenceImages.map((url, idx) => (
+                        <img
+                          key={idx}
+                          src={url}
+                          alt={`Reference ${idx + 1}`}
+                          className="w-full h-24 object-cover rounded border"
+                        />
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
