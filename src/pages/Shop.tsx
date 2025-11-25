@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import printerImage from "@/assets/printer-product.jpg";
-import { Check, Loader2 } from "lucide-react";
+import { Search, Loader2, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -14,31 +16,79 @@ interface Product {
   price: number;
   image_url: string;
   stock: number;
+  category: string;
 }
 
 const Shop = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("newest");
+  const [categoryFilter, setCategoryFilter] = useState("all");
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .order("created_at", { ascending: false });
+      let query = supabase.from("products").select(`
+        *,
+        orders(quantity)
+      `);
+
+      // Apply search filter
+      if (searchQuery) {
+        query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+      }
+
+      // Apply category filter
+      if (categoryFilter !== "all") {
+        query = query.eq("category", categoryFilter);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
-      setProducts(data || []);
+
+      // Calculate total sales for each product
+      let productsWithSales = (data || []).map(product => {
+        const totalSales = product.orders?.reduce((sum: number, order: any) => sum + order.quantity, 0) || 0;
+        return { ...product, totalSales };
+      });
+
+      // Apply sorting
+      switch (sortBy) {
+        case "price-low":
+          productsWithSales.sort((a, b) => a.price - b.price);
+          break;
+        case "price-high":
+          productsWithSales.sort((a, b) => b.price - a.price);
+          break;
+        case "best-selling":
+          productsWithSales.sort((a, b) => b.totalSales - a.totalSales);
+          break;
+        case "name":
+          productsWithSales.sort((a, b) => a.name.localeCompare(b.name));
+          break;
+        default: // newest
+          productsWithSales.sort((a, b) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+      }
+
+      setProducts(productsWithSales);
     } catch (error: any) {
       toast.error("Failed to load products");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [searchQuery, sortBy, categoryFilter]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchProducts();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [fetchProducts]);
 
   const handleAddToCart = async (product: Product) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -83,6 +133,50 @@ const Shop = () => {
               Perfect for professionals and enthusiasts alike.
             </p>
           </motion.div>
+        </div>
+      </section>
+
+      {/* Search and Filters */}
+      <section className="py-8 border-b">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row gap-4 items-center">
+            <div className="relative flex-1 w-full">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search 3D printers and models..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 w-full"
+              />
+            </div>
+            <div className="flex gap-3 w-full md:w-auto">
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-full md:w-[180px]">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest First</SelectItem>
+                  <SelectItem value="best-selling">Best Selling</SelectItem>
+                  <SelectItem value="price-low">Price: Low to High</SelectItem>
+                  <SelectItem value="price-high">Price: High to Low</SelectItem>
+                  <SelectItem value="name">Name A-Z</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full md:w-[180px]">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Products</SelectItem>
+                  <SelectItem value="3d_printer">3D Printers</SelectItem>
+                  <SelectItem value="3d_model">3D Models</SelectItem>
+                  <SelectItem value="accessory">Accessories</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
       </section>
 
