@@ -50,7 +50,11 @@ const Auth = () => {
         navigate("/");
       }
     } catch (error: any) {
-      toast.error(error.message || "Authentication failed");
+      if (error.message?.includes("Invalid login credentials")) {
+        toast.error("Account not found. Please sign up first or check your credentials.");
+      } else {
+        toast.error(error.message || "Authentication failed");
+      }
     } finally {
       setIsLoading(false);
     }
