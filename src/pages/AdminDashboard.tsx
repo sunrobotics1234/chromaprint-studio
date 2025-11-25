@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, Package, ShoppingCart, DollarSign, TrendingUp, Plus } from "lucide-react";
+import { Loader2, Package, ShoppingCart, DollarSign, TrendingUp, Plus, AlertTriangle, TrendingDown } from "lucide-react";
 
 interface Product {
   id: string;
@@ -16,6 +18,8 @@ interface Product {
   price: number;
   stock: number;
   image_url: string;
+  category: string;
+  totalSales?: number;
 }
 
 interface Order {
@@ -38,7 +42,8 @@ const AdminDashboard = () => {
     description: "",
     price: "",
     stock: "",
-    image_url: ""
+    image_url: "",
+    category: "3d_printer"
   });
 
   useEffect(() => {
@@ -78,11 +83,20 @@ const AdminDashboard = () => {
 
   const fetchDashboardData = async () => {
     const [productsRes, ordersRes] = await Promise.all([
-      supabase.from("products").select("*").order("created_at", { ascending: false }),
-      supabase.from("orders").select("*, products(name)").order("created_at", { ascending: false }).limit(10)
+      supabase.from("products").select(`
+        *,
+        orders(quantity)
+      `).order("created_at", { ascending: false }),
+      supabase.from("orders").select("*, products(name)").order("created_at", { ascending: false })
     ]);
 
-    if (productsRes.data) setProducts(productsRes.data);
+    if (productsRes.data) {
+      const productsWithSales = productsRes.data.map(product => {
+        const totalSales = product.orders?.reduce((sum: number, order: any) => sum + order.quantity, 0) || 0;
+        return { ...product, totalSales };
+      });
+      setProducts(productsWithSales);
+    }
     if (ordersRes.data) setOrders(ordersRes.data);
   };
 
@@ -94,14 +108,15 @@ const AdminDashboard = () => {
         description: newProduct.description,
         price: parseFloat(newProduct.price),
         stock: parseInt(newProduct.stock),
-        image_url: newProduct.image_url
+        image_url: newProduct.image_url,
+        category: newProduct.category
       });
 
       if (error) throw error;
       
       toast.success("Product added successfully!");
       setShowAddProduct(false);
-      setNewProduct({ name: "", description: "", price: "", stock: "", image_url: "" });
+      setNewProduct({ name: "", description: "", price: "", stock: "", image_url: "", category: "3d_printer" });
       fetchDashboardData();
     } catch (error: any) {
       toast.error(error.message);
@@ -111,6 +126,12 @@ const AdminDashboard = () => {
   const totalRevenue = orders.reduce((sum, order) => sum + Number(order.total_amount), 0);
   const totalOrders = orders.length;
   const totalProducts = products.length;
+  const lowStockProducts = products.filter(p => p.stock < 5);
+  const outOfStockProducts = products.filter(p => p.stock === 0);
+  const bestSellingProduct = products.reduce((prev, current) => 
+    (current.totalSales || 0) > (prev.totalSales || 0) ? current : prev
+  , products[0]);
+  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
   if (isLoading) {
     return (
@@ -130,8 +151,46 @@ const AdminDashboard = () => {
           <p className="text-muted-foreground">Monitor sales and manage products</p>
         </div>
 
+        {/* Inventory Alerts */}
+        {(lowStockProducts.length > 0 || outOfStockProducts.length > 0) && (
+          <div className="mb-6">
+            <Card className="border-orange-500">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-orange-500" />
+                  <CardTitle className="text-orange-500">Inventory Alerts</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {outOfStockProducts.length > 0 && (
+                    <div className="p-3 bg-red-50 dark:bg-red-950 rounded-lg">
+                      <p className="font-semibold text-red-700 dark:text-red-400">Out of Stock ({outOfStockProducts.length})</p>
+                      <div className="mt-2 space-y-1">
+                        {outOfStockProducts.map(p => (
+                          <p key={p.id} className="text-sm text-red-600 dark:text-red-400">• {p.name}</p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {lowStockProducts.length > 0 && (
+                    <div className="p-3 bg-orange-50 dark:bg-orange-950 rounded-lg">
+                      <p className="font-semibold text-orange-700 dark:text-orange-400">Low Stock ({lowStockProducts.length})</p>
+                      <div className="mt-2 space-y-1">
+                        {lowStockProducts.map(p => (
+                          <p key={p.id} className="text-sm text-orange-600 dark:text-orange-400">• {p.name} - {p.stock} units left</p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Stats Cards */}
-        <div className="grid md:grid-cols-4 gap-4 mb-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
@@ -164,11 +223,76 @@ const AdminDashboard = () => {
           
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Growth</CardTitle>
+              <CardTitle className="text-sm font-medium">Avg Order Value</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">+12.5%</div>
+              <div className="text-2xl font-bold">₹{avgOrderValue.toFixed(2)}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* KPI Cards */}
+        <div className="grid md:grid-cols-3 gap-4 mb-8">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Best Selling Product</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                <p className="font-semibold text-lg">{bestSellingProduct?.name || 'N/A'}</p>
+                <p className="text-sm text-muted-foreground">
+                  {bestSellingProduct?.totalSales || 0} units sold
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Stock Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm">In Stock</span>
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                    {products.filter(p => p.stock > 5).length}
+                  </Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm">Low Stock</span>
+                  <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                    {lowStockProducts.length}
+                  </Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm">Out of Stock</span>
+                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                    {outOfStockProducts.length}
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Restock Recommendations</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {lowStockProducts.length > 0 || outOfStockProducts.length > 0 ? (
+                <div className="space-y-1">
+                  <p className="text-sm text-orange-600 dark:text-orange-400">
+                    ⚠️ {lowStockProducts.length + outOfStockProducts.length} product(s) need attention
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Prioritize restocking high-demand items
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-green-600">✓ All products well stocked</p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -229,6 +353,22 @@ const AdminDashboard = () => {
                       onChange={(e) => setNewProduct({...newProduct, image_url: e.target.value})}
                     />
                   </div>
+                  <div>
+                    <Label htmlFor="category">Category</Label>
+                    <Select 
+                      value={newProduct.category} 
+                      onValueChange={(value) => setNewProduct({...newProduct, category: value})}
+                    >
+                      <SelectTrigger id="category">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="3d_printer">3D Printer</SelectItem>
+                        <SelectItem value="3d_model">3D Model</SelectItem>
+                        <SelectItem value="accessory">Accessory</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="description">Description</Label>
@@ -245,13 +385,33 @@ const AdminDashboard = () => {
             <div className="space-y-4">
               {products.map((product) => (
                 <div key={product.id} className="flex justify-between items-center p-4 border rounded-lg">
-                  <div>
-                    <h3 className="font-semibold">{product.name}</h3>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold">{product.name}</h3>
+                      <Badge variant="outline" className="text-xs">
+                        {product.category.replace('_', ' ')}
+                      </Badge>
+                      {product.stock === 0 && (
+                        <Badge variant="destructive" className="text-xs">Out of Stock</Badge>
+                      )}
+                      {product.stock > 0 && product.stock < 5 && (
+                        <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
+                          Low Stock
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground">{product.description}</p>
+                    {product.totalSales !== undefined && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Total Sales: {product.totalSales} units
+                      </p>
+                    )}
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold">${product.price}</p>
-                    <p className="text-sm text-muted-foreground">Stock: {product.stock}</p>
+                  <div className="text-right ml-4">
+                    <p className="font-bold">₹{product.price}</p>
+                    <p className={`text-sm ${product.stock === 0 ? 'text-red-600' : product.stock < 5 ? 'text-orange-600' : 'text-muted-foreground'}`}>
+                      Stock: {product.stock}
+                    </p>
                   </div>
                 </div>
               ))}
