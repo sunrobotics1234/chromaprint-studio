@@ -6,15 +6,20 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ModelBuilder } from "@/components/ModelBuilder";
 import { AuthModal } from "@/components/AuthModal";
+import { MaterialSelector } from "@/components/MaterialSelector";
 import { useDropzone } from "react-dropzone";
 import { Upload, Loader2, Sparkles, Camera, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useCart } from "@/contexts/CartContext";
+import { MaterialType, MATERIAL_PRICES, formatINR } from "@/lib/currency";
 
 const CustomPrinting = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [dimensions, setDimensions] = useState({ length: "", width: "", height: "" });
+  const [selectedMaterial, setSelectedMaterial] = useState<MaterialType>("PLA");
   const [estimatedCost, setEstimatedCost] = useState<number | null>(null);
+  const [estimatedWeight, setEstimatedWeight] = useState<number>(0);
   const [isEstimating, setIsEstimating] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -22,6 +27,7 @@ const CustomPrinting = () => {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const { addToCart } = useCart();
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -52,13 +58,19 @@ const CustomPrinting = () => {
 
     setIsEstimating(true);
 
-    // Simulate AI cost estimation
+    // Simulate AI cost estimation with material pricing
     setTimeout(() => {
       const volume = parseFloat(dimensions.length) * parseFloat(dimensions.width) * parseFloat(dimensions.height);
-      const baseCost = 50;
-      const volumeCost = volume * 2.5;
-      const complexityFactor = 1.2;
-      const estimated = Math.round((baseCost + volumeCost) * complexityFactor);
+      
+      // Estimate weight (assuming 1.2g/cm³ density average)
+      const weight = Math.round((volume / 1000) * 1.2);
+      setEstimatedWeight(weight);
+      
+      // Calculate cost based on material
+      const materialCost = weight * MATERIAL_PRICES[selectedMaterial];
+      const baseCost = 100; // Base processing cost in INR
+      const complexityFactor = 1.3;
+      const estimated = Math.round((baseCost + materialCost) * complexityFactor);
 
       setEstimatedCost(estimated);
       setIsEstimating(false);
@@ -69,9 +81,28 @@ const CustomPrinting = () => {
   const handleAddToCart = () => {
     if (!isAuthenticated) {
       setShowAuthModal(true);
-    } else {
-      toast.success("Added to cart! You'll receive a final quote via email.");
+      return;
     }
+    
+    if (!estimatedCost) {
+      toast.error("Please get a cost estimate first");
+      return;
+    }
+
+    addToCart({
+      name: uploadedFile?.name || "Custom 3D Print",
+      price: estimatedCost,
+      quantity: 1,
+      material: selectedMaterial,
+      dimensions: {
+        length: parseFloat(dimensions.length),
+        width: parseFloat(dimensions.width),
+        height: parseFloat(dimensions.height),
+      },
+      isCustom: true,
+    });
+    
+    toast.success("Added to cart! Final quote will be confirmed at checkout.");
   };
 
   const handleImageUpload = async (file: File) => {
@@ -282,43 +313,54 @@ const CustomPrinting = () => {
                     Enter the final desired dimensions for your print
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="length">Length</Label>
-                      <Input
-                        id="length"
-                        type="number"
-                        placeholder="100"
-                        value={dimensions.length}
-                        onChange={(e) =>
-                          setDimensions({ ...dimensions, length: e.target.value })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="width">Width</Label>
-                      <Input
-                        id="width"
-                        type="number"
-                        placeholder="100"
-                        value={dimensions.width}
-                        onChange={(e) =>
-                          setDimensions({ ...dimensions, width: e.target.value })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="height">Height</Label>
-                      <Input
-                        id="height"
-                        type="number"
-                        placeholder="100"
-                        value={dimensions.height}
-                        onChange={(e) =>
-                          setDimensions({ ...dimensions, height: e.target.value })
-                        }
-                      />
+                <CardContent className="space-y-6">
+                  {/* Material Selection */}
+                  <MaterialSelector 
+                    selected={selectedMaterial}
+                    onSelect={setSelectedMaterial}
+                    estimatedWeight={estimatedWeight}
+                  />
+
+                  {/* Dimensions Input */}
+                  <div>
+                    <Label className="text-lg font-semibold mb-3 block">Dimensions</Label>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="length">Length</Label>
+                        <Input
+                          id="length"
+                          type="number"
+                          placeholder="100"
+                          value={dimensions.length}
+                          onChange={(e) =>
+                            setDimensions({ ...dimensions, length: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="width">Width</Label>
+                        <Input
+                          id="width"
+                          type="number"
+                          placeholder="100"
+                          value={dimensions.width}
+                          onChange={(e) =>
+                            setDimensions({ ...dimensions, width: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="height">Height</Label>
+                        <Input
+                          id="height"
+                          type="number"
+                          placeholder="100"
+                          value={dimensions.height}
+                          onChange={(e) =>
+                            setDimensions({ ...dimensions, height: e.target.value })
+                          }
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -348,9 +390,12 @@ const CustomPrinting = () => {
                       className="p-6 rounded-lg gradient-warm text-primary-foreground text-center"
                     >
                       <p className="text-sm mb-2">Estimated Cost</p>
-                      <p className="font-display text-4xl">₹{estimatedCost.toLocaleString()}</p>
+                      <p className="font-display text-4xl">{formatINR(estimatedCost)}</p>
                       <p className="text-sm mt-2 opacity-90">
-                        Final price will be confirmed via email
+                        Material: {selectedMaterial} • Weight: ~{estimatedWeight}g
+                      </p>
+                      <p className="text-xs mt-1 opacity-75">
+                        Final price will be confirmed at checkout
                       </p>
                     </motion.div>
                   )}
@@ -361,7 +406,7 @@ const CustomPrinting = () => {
                       variant="hero"
                       className="w-full"
                     >
-                      Submit for Final Quote
+                      Add to Cart
                     </Button>
                   )}
                 </CardContent>

@@ -8,6 +8,8 @@ import printerImage from "@/assets/printer-product.jpg";
 import { Search, Loader2, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useCart } from "@/contexts/CartContext";
+import { formatINR, usdToINR } from "@/lib/currency";
 
 interface Product {
   id: string;
@@ -25,6 +27,7 @@ const Shop = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("newest");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const { addToCart } = useCart();
 
   const fetchProducts = useCallback(async () => {
     setIsLoading(true);
@@ -98,20 +101,13 @@ const Shop = () => {
       return;
     }
 
-    try {
-      const { error } = await supabase.from("orders").insert({
-        user_id: session.user.id,
-        product_id: product.id,
-        quantity: 1,
-        total_amount: product.price,
-        status: "pending"
-      });
-
-      if (error) throw error;
-      toast.success("Added to cart!");
-    } catch (error: any) {
-      toast.error(error.message);
-    }
+    addToCart({
+      product_id: product.id,
+      name: product.name,
+      price: product.price,
+      quantity: 1,
+      image_url: product.image_url,
+    });
   };
 
   return (
@@ -219,7 +215,7 @@ const Shop = () => {
                     <CardContent className="flex-1 flex flex-col">
                       <div className="space-y-4 flex-1">
                         <div className="pt-4 border-t mt-auto">
-                          <p className="font-display text-3xl mb-2">₹{product.price.toLocaleString()}</p>
+                          <p className="font-display text-3xl mb-2">{formatINR(product.price)}</p>
                           <p className="text-sm text-muted-foreground mb-4">
                             {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
                           </p>

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Loader2, Package, ShoppingCart, DollarSign, TrendingUp, Plus, AlertTriangle, TrendingDown } from "lucide-react";
+import { formatINR } from "@/lib/currency";
 
 interface Product {
   id: string;
@@ -227,7 +228,7 @@ const AdminDashboard = () => {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">₹{avgOrderValue.toFixed(2)}</div>
+              <div className="text-2xl font-bold">{formatINR(avgOrderValue)}</div>
             </CardContent>
           </Card>
         </div>
@@ -408,7 +409,7 @@ const AdminDashboard = () => {
                     )}
                   </div>
                   <div className="text-right ml-4">
-                    <p className="font-bold">₹{product.price}</p>
+                    <p className="font-bold">{formatINR(product.price)}</p>
                     <p className={`text-sm ${product.stock === 0 ? 'text-red-600' : product.stock < 5 ? 'text-orange-600' : 'text-muted-foreground'}`}>
                       Stock: {product.stock}
                     </p>

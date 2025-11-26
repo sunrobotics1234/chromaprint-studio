@@ -1,16 +1,19 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, User, LogOut, Shield } from "lucide-react";
+import { Menu, X, User, LogOut, Shield, ShoppingCart, Package } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { User as SupabaseUser } from "@supabase/supabase-js";
+import { useCart } from "@/contexts/CartContext";
+import { Badge } from "@/components/ui/badge";
 
 export const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
+  const { itemCount } = useCart();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -70,12 +73,28 @@ export const Navigation = () => {
             <Link to="/custom" className="text-foreground hover:text-primary transition-smooth">
               Custom Printing
             </Link>
+            {user && (
+              <Link to="/orders" className="text-foreground hover:text-primary transition-smooth flex items-center gap-1">
+                <Package className="w-4 h-4" />
+                Orders
+              </Link>
+            )}
             {isAdmin && (
               <Link to="/admin" className="text-foreground hover:text-primary transition-smooth flex items-center gap-1">
                 <Shield className="w-4 h-4" />
                 Admin
               </Link>
             )}
+            <Link to="/cart" className="relative">
+              <Button variant="ghost" size="icon">
+                <ShoppingCart className="w-5 h-5" />
+                {itemCount > 0 && (
+                  <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
+                    {itemCount}
+                  </Badge>
+                )}
+              </Button>
+            </Link>
             {user ? (
               <Button variant="outline" size="sm" onClick={handleSignOut}>
                 <LogOut className="w-4 h-4 mr-2" />
@@ -131,6 +150,22 @@ export const Navigation = () => {
               >
                 Custom Printing
               </Link>
+              <Link
+                to="/cart"
+                className="block py-2 text-foreground hover:text-primary transition-smooth"
+                onClick={() => setIsOpen(false)}
+              >
+                Cart {itemCount > 0 && `(${itemCount})`}
+              </Link>
+              {user && (
+                <Link
+                  to="/orders"
+                  className="block py-2 text-foreground hover:text-primary transition-smooth"
+                  onClick={() => setIsOpen(false)}
+                >
+                  My Orders
+                </Link>
+              )}
               {isAdmin && (
                 <Link
                   to="/admin"
